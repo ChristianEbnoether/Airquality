@@ -1,0 +1,46 @@
+#!/bin/bash
+sleeptime=15
+curl -s http://[username:password]@192.168.97.241/relay/0?turn=off
+
+get_info () {
+	DATA="$(curl  http://192.168.97.245 -w 0.01 -s)"
+	hum=`(echo $DATA | awk -F '<b>' '{print $3}'  | egrep  -o '[0-9]{1,2}.[0-9]{1,2}')`
+	co2=`(echo $DATA | awk -F '<b>' '{print $4}'  | awk -F '</b>' '{print $2}' | egrep  -o '[0-9]{1,4}')`
+}
+
+write_data () {
+     #Write the data to the database
+     curl -s -i -XPOST 'http://127.0.0.1:8086/write?db=air' --data-binary "fanstearing,location=EG,sensor=CO2 value=1"
+     #curl -s -i -XPOST 'http://127.0.0.1:8086/write?db=air' --data-binary "fanstearing,serial=$serial,sensor=hum value=$hum"
+}
+write_data_off () {
+     #Write the data to the database
+     curl -s -i -XPOST 'http://127.0.0.1:8086/write?db=air' --data-binary "fanstearing,location=EG,sensor=CO2 value=0"
+     #curl -s -i -XPOST 'http://127.0.0.1:8086/write?db=air' --data-binary "fanstearing,serial=$serial,sensor=hum value=$hum"
+}
+
+while :
+do
+	#Sleep between readings
+	sleep "$sleeptime"
+	currenttime=$(date +%H:%M)
+	get_info
+	if [[ "$currenttime" > "22:00" ]] || [[ "$currenttime" < "05:00" ]];  then
+		if [[ $co2 -le 800 ]]; then
+	 		curl -s http://[username:password]@192.168.97.241/relay/0?turn=off				echo "Skip this datapoint - something went wrong with the read"
+			write_data_off
+		else
+			curl -s http://[username:password]@192.168.97.241/relay/0?turn=on
+		fi
+			
+	else 
+		if [[ $co2 -le 650 ]]; then
+	 		curl -s http://[username:password]1@192.168.97.241/relay/0?turn=off				echo "Skip this datapoint - something went wrong with the read"
+			write_data_off
+		else
+			curl -s http://[username:password]@192.168.97.241/relay/0?turn=on
+			write_data
+		fi
+		
+	fi
+done
